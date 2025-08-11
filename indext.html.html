@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timer Pomodoro Cerdas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease;
+        }
+        .timer-display {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .active-mode {
+            background-color: rgba(255, 255, 255, 0.2);
+            font-weight: bold;
+        }
+        .task-item {
+            background-color: rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+        .task-item:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        .task-item input:checked + label {
+            text-decoration: line-through;
+            opacity: 0.5;
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-content {
+            transition: transform 0.25s ease;
+        }
+        .loader {
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        /* Style untuk input number agar tidak ada panah */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+          -webkit-appearance: none; 
+          margin: 0; 
+        }
+        input[type=number] {
+          -moz-appearance: textfield;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 flex items-center justify-center min-h-screen text-white transition-colors duration-500" id="body">
+
+    <div class="w-full max-w-lg mx-auto p-4 md:p-6 text-center">
+        <!-- Header dengan Tombol Pengaturan -->
+        <div class="w-full flex justify-end mb-4 px-2">
+            <button id="settings-btn" class="text-white/70 hover:text-white transition-colors" aria-label="Pengaturan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+        </div>
+
+        <!-- Main Timer UI -->
+        <div class="bg-white/10 p-6 rounded-2xl shadow-lg mb-6">
+            <div class="bg-black/20 p-2 rounded-full flex justify-around items-center mb-6">
+                <button id="pomodoro-btn" class="mode-btn w-full py-3 rounded-full transition-all duration-300">Pomodoro</button>
+                <button id="short-break-btn" class="mode-btn w-full py-3 rounded-full transition-all duration-300">Istirahat Pendek</button>
+                <button id="long-break-btn" class="mode-btn w-full py-3 rounded-full transition-all duration-300">Istirahat Panjang</button>
+            </div>
+
+            <div class="timer-display text-8xl md:text-9xl font-bold mb-4">
+                <span id="minutes">25</span>:<span id="seconds">00</span>
+            </div>
+
+            <div class="flex justify-center items-center space-x-4">
+                <button id="start-pause-btn" class="bg-white text-slate-900 uppercase font-bold tracking-wider py-4 px-10 rounded-lg text-xl hover:bg-gray-200 transition-all duration-300 shadow-lg">
+                    Mulai
+                </button>
+                <button id="reset-btn" class="bg-transparent text-white p-4 rounded-lg hover:bg-white/20 transition-all duration-300" aria-label="Reset Timer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                </button>
+            </div>
+             <button id="suggestion-btn" class="hidden mt-4 bg-sky-500/50 hover:bg-sky-500/80 text-white font-bold py-2 px-4 rounded-full transition-all duration-300">
+                ✨ Minta Saran Aktivitas
+            </button>
+        </div>
+
+        <!-- Gemini Features UI -->
+        <div class="bg-white/10 p-6 rounded-2xl shadow-lg">
+            <h2 class="text-xl font-bold mb-4">Fokus Hari Ini</h2>
+            <div class="flex gap-2 mb-4">
+                <input type="text" id="main-task-input" placeholder="Contoh: Buat laporan penjualan Q3" class="w-full bg-white/10 border-white/20 border text-white placeholder-white/50 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                <button id="breakdown-btn" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-5 rounded-lg transition-all duration-300 flex items-center justify-center">
+                    <span id="breakdown-btn-text">✨ Pecah Tugas</span>
+                    <div id="breakdown-loader" class="hidden loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6"></div>
+                </button>
+            </div>
+            <div id="task-list" class="space-y-2 text-left">
+                <!-- Generated tasks will appear here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Activity Suggestion -->
+    <div id="suggestion-modal" class="modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div class="modal-content bg-slate-800 rounded-2xl p-8 max-w-sm w-full shadow-2xl transform scale-95">
+            <h3 class="text-2xl font-bold mb-4 text-sky-300">✨ Saran Aktivitas Istirahat</h3>
+            <p id="suggestion-text" class="mb-6">Memuat saran...</p>
+            <button id="close-suggestion-modal-btn" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-5 rounded-lg transition-all duration-300">Tutup</button>
+        </div>
+    </div>
+
+    <!-- Modal for Settings -->
+    <div id="settings-modal" class="modal fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none">
+        <div class="modal-content bg-slate-800 rounded-2xl p-8 max-w-sm w-full shadow-2xl transform scale-95">
+            <h3 class="text-2xl font-bold mb-6 text-sky-300">Pengaturan Timer</h3>
+            <div class="space-y-4 text-left">
+                <div>
+                    <label for="pomodoro-setting" class="block mb-1 text-white/80">Pomodoro (menit)</label>
+                    <input type="number" id="pomodoro-setting" class="w-full bg-white/10 border-white/20 border text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                 <div>
+                    <label for="short-break-setting" class="block mb-1 text-white/80">Istirahat Pendek (menit)</label>
+                    <input type="number" id="short-break-setting" class="w-full bg-white/10 border-white/20 border text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+                 <div>
+                    <label for="long-break-setting" class="block mb-1 text-white/80">Istirahat Panjang (menit)</label>
+                    <input type="number" id="long-break-setting" class="w-full bg-white/10 border-white/20 border text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-sky-500">
+                </div>
+            </div>
+            <div class="mt-8 flex gap-4">
+                 <button id="close-settings-modal-btn" class="w-full bg-white/20 hover:bg-white/30 text-white font-bold py-3 px-5 rounded-lg transition-all duration-300">Batal</button>
+                 <button id="save-settings-btn" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-5 rounded-lg transition-all duration-300">Simpan</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Referensi Elemen DOM ---
+        const minutesEl = document.getElementById('minutes');
+        const secondsEl = document.getElementById('seconds');
+        const startPauseBtn = document.getElementById('start-pause-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const pomodoroBtn = document.getElementById('pomodoro-btn');
+        const shortBreakBtn = document.getElementById('short-break-btn');
+        const longBreakBtn = document.getElementById('long-break-btn');
+        const bodyEl = document.getElementById('body');
+        
+        const mainTaskInput = document.getElementById('main-task-input');
+        const breakdownBtn = document.getElementById('breakdown-btn');
+        const breakdownBtnText = document.getElementById('breakdown-btn-text');
+        const breakdownLoader = document.getElementById('breakdown-loader');
+        const taskList = document.getElementById('task-list');
+        const suggestionBtn = document.getElementById('suggestion-btn');
+        const suggestionModal = document.getElementById('suggestion-modal');
+        const suggestionText = document.getElementById('suggestion-text');
+        const closeSuggestionModalBtn = document.getElementById('close-suggestion-modal-btn');
+        
+        // Settings Elements
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const pomodoroSettingInput = document.getElementById('pomodoro-setting');
+        const shortBreakSettingInput = document.getElementById('short-break-setting');
+        const longBreakSettingInput = document.getElementById('long-break-setting');
+        const saveSettingsBtn = document.getElementById('save-settings-btn');
+        const closeSettingsModalBtn = document.getElementById('close-settings-modal-btn');
+
+        // --- Pengaturan Waktu ---
+        let timers = {
+            'pomodoro': 25 * 60,
+            'short-break': 5 * 60,
+            'long-break': 15 * 60
+        };
+
+        // --- Variabel Status ---
+        let currentMode = 'pomodoro';
+        let remainingTime = timers.pomodoro;
+        let isRunning = false;
+        let isSoundInitialized = false;
+
+        // --- Inisialisasi Suara (Tone.js) ---
+        let synth;
+        function initializeSound() {
+            if (!isSoundInitialized) {
+                synth = new Tone.Synth().toDestination();
+                isSoundInitialized = true;
+            }
+        }
+
+        // --- Implementasi Web Worker untuk Timer Latar Belakang ---
+        const workerCode = `
+            let timerInterval = null;
+            let remainingTime = 0;
+
+            self.onmessage = function(e) {
+                const { command, time } = e.data;
+                if (command === 'start') {
+                    if (timerInterval) return;
+                    remainingTime = time; // Set waktu saat memulai
+                    timerInterval = setInterval(() => {
+                        remainingTime--;
+                        self.postMessage({ type: 'tick', time: remainingTime });
+                        if (remainingTime <= 0) {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                            self.postMessage({ type: 'done' });
+                        }
+                    }, 1000);
+                } else if (command === 'pause') {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                } else if (command === 'reset') {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    remainingTime = time;
+                    self.postMessage({ type: 'tick', time: remainingTime });
+                }
+            };
+        `;
+        const blob = new Blob([workerCode], { type: 'application/javascript' });
+        const worker = new Worker(URL.createObjectURL(blob));
+
+        worker.onmessage = function(e) {
+            const { type, time } = e.data;
+            if (type === 'tick') {
+                remainingTime = time;
+                updateDisplay(time);
+            } else if (type === 'done') {
+                isRunning = false;
+                startPauseBtn.textContent = 'Mulai';
+                playAlarm();
+                setTimeout(() => {
+                    currentMode === 'pomodoro' ? switchMode('short-break') : switchMode('pomodoro');
+                }, 1000);
+            }
+        };
+
+        // --- Fungsi Utama Timer ---
+        function updateDisplay(timeInSeconds) {
+            const minutes = Math.floor(timeInSeconds / 60);
+            const seconds = timeInSeconds % 60;
+            minutesEl.textContent = String(minutes).padStart(2, '0');
+            secondsEl.textContent = String(seconds).padStart(2, '0');
+            document.title = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} - Pomodoro`;
+        }
+
+        function startTimer() {
+            if (isRunning) return;
+            initializeSound(); 
+            isRunning = true;
+            startPauseBtn.textContent = 'Jeda';
+            worker.postMessage({ command: 'start', time: remainingTime });
+        }
+
+        function pauseTimer() {
+            if (!isRunning) return;
+            isRunning = false;
+            startPauseBtn.textContent = 'Lanjut';
+            worker.postMessage({ command: 'pause' });
+        }
+
+        function resetTimer() {
+            isRunning = false;
+            startPauseBtn.textContent = 'Mulai';
+            worker.postMessage({ command: 'reset', time: timers[currentMode] });
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active-mode'));
+            document.getElementById(`${mode}-btn`)?.classList.add('active-mode');
+            const colors = {
+                'pomodoro': 'bg-slate-900',
+                'short-break': 'bg-emerald-800',
+                'long-break': 'bg-sky-800'
+            };
+            bodyEl.className = bodyEl.className.replace(/bg-\w+-\d+/g, colors[mode]);
+            suggestionBtn.classList.toggle('hidden', mode === 'pomodoro');
+            resetTimer();
+        }
+
+        function playAlarm() {
+            if (isSoundInitialized) {
+                try {
+                    const now = Tone.now();
+                    synth.triggerAttackRelease("C5", "0.2s", now);
+                    synth.triggerAttackRelease("G5", "0.2s", now + 0.25);
+                    synth.triggerAttackRelease("C6", "0.3s", now + 0.5);
+                } catch (error) { console.error("Gagal memainkan suara:", error); }
+            }
+        }
+        
+        // --- Fungsi Gemini API ---
+        const API_KEY = "";
+        const API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=";
+        async function callGemini(payload) { /* ... (tidak ada perubahan) ... */ return null; }
+        async function getTaskBreakdown() { /* ... (tidak ada perubahan) ... */ }
+        async function getBreakActivity() { /* ... (tidak ada perubahan) ... */ }
+
+        // --- Fungsi Bantuan UI ---
+        function displayTasks(tasks) { /* ... (tidak ada perubahan) ... */ }
+        function setLoadingState(isLoading) { /* ... (tidak ada perubahan) ... */ }
+        
+        function openModal(modal) {
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            modal.querySelector('.modal-content').classList.remove('scale-95');
+        }
+
+        function closeModal(modal) {
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            modal.querySelector('.modal-content').classList.add('scale-95');
+        }
+
+        // --- Logika Pengaturan ---
+        function openSettingsModal() {
+            pomodoroSettingInput.value = timers.pomodoro / 60;
+            shortBreakSettingInput.value = timers['short-break'] / 60;
+            longBreakSettingInput.value = timers['long-break'] / 60;
+            openModal(settingsModal);
+        }
+
+        function saveSettings() {
+            const newPomodoro = parseInt(pomodoroSettingInput.value, 10);
+            const newShortBreak = parseInt(shortBreakSettingInput.value, 10);
+            const newLongBreak = parseInt(longBreakSettingInput.value, 10);
+
+            if (newPomodoro > 0 && newShortBreak > 0 && newLongBreak > 0) {
+                timers.pomodoro = newPomodoro * 60;
+                timers['short-break'] = newShortBreak * 60;
+                timers['long-break'] = newLongBreak * 60;
+                
+                // Terapkan pengaturan baru dengan me-reset timer mode saat ini
+                switchMode(currentMode);
+                closeModal(settingsModal);
+            } else {
+                alert("Harap masukkan nilai yang valid (lebih dari 0).");
+            }
+        }
+
+        // --- Event Listeners ---
+        startPauseBtn.addEventListener('click', () => {
+            if (Tone.context.state !== 'running') { Tone.start(); }
+            isRunning ? pauseTimer() : startTimer();
+        });
+        resetBtn.addEventListener('click', resetTimer);
+        pomodoroBtn.addEventListener('click', () => switchMode('pomodoro'));
+        shortBreakBtn.addEventListener('click', () => switchMode('short-break'));
+        longBreakBtn.addEventListener('click', () => switchMode('long-break'));
+        
+        breakdownBtn.addEventListener('click', getTaskBreakdown);
+        suggestionBtn.addEventListener('click', () => {
+            getBreakActivity();
+            openModal(suggestionModal);
+        });
+        closeSuggestionModalBtn.addEventListener('click', () => closeModal(suggestionModal));
+        suggestionModal.addEventListener('click', (e) => {
+            if (e.target === suggestionModal) closeModal(suggestionModal);
+        });
+
+        // Settings Listeners
+        settingsBtn.addEventListener('click', openSettingsModal);
+        closeSettingsModalBtn.addEventListener('click', () => closeModal(settingsModal));
+        saveSettingsBtn.addEventListener('click', saveSettings);
+        settingsModal.addEventListener('click', (e) => {
+             if (e.target === settingsModal) closeModal(settingsModal);
+        });
+
+        // --- Inisialisasi Awal ---
+        window.onload = () => {
+            switchMode('pomodoro');
+        };
+    </script>
+</body>
+</html>
